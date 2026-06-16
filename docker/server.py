@@ -23,6 +23,7 @@ import trafilatura
 PORT = int(os.environ.get('KB_PORT', 8396))
 DEFAULT_KB_DIR = os.environ.get('KB_DIR', '/data/knowledge-base')
 CONFIG_FILE = Path('/data/config/config.json')
+HOST_SAVE_PATH = os.environ.get('HOST_SAVE_PATH', '')  # Host path for display in UI
 
 # Browser headers for bypassing anti-scraping
 HEADERS = {
@@ -146,17 +147,17 @@ SETTINGS_HTML = r"""<!DOCTYPE html>
 
   <div class="stats" id="stats">
     <div class="row"><span class="label">Status</span><span class="value" id="serverStatus">Loading...</span></div>
-    <div class="row"><span class="label">Save Path</span><span class="value" id="currentPath">—</span></div>
+    <div class="row"><span class="label">Current Path</span><span class="value" id="currentPath">—</span></div>
     <div class="row"><span class="label">Files Saved</span><span class="value" id="fileCount">—</span></div>
   </div>
 
   <div class="field">
-    <label>Save Path</label>
-    <input type="text" id="savePath" placeholder="/data/knowledge-base">
-    <div class="hint">Absolute path where Markdown files will be saved. The directory will be created automatically if it doesn't exist.</div>
+    <label>Host Save Path</label>
+    <input type="text" id="hostSavePath" placeholder="/home/yourname/notes">
+    <div class="hint">Absolute path on the HOST machine where Markdown files will be saved. This updates docker-compose.yml — restart the container after saving.</div>
   </div>
 
-  <button class="btn btn-primary" id="saveBtn">💾 Save Settings</button>
+  <button class="btn btn-primary" id="saveBtn">💾 Save & Update docker-compose.yml</button>
   <button class="btn btn-secondary" id="testBtn">🔗 Test Connection</button>
 
   <div class="status" id="status"></div>
@@ -178,10 +179,10 @@ async function loadConfig() {
   try {
     const resp = await fetch('/api/config');
     const data = await resp.json();
-    document.getElementById('savePath').value = data.save_path || '';
-    document.getElementById('currentPath').textContent = data.save_path || '—';
+    document.getElementById('hostSavePath').value = data.host_save_path || '';
     document.getElementById('serverStatus').textContent = '✅ Running';
     document.getElementById('fileCount').textContent = data.file_count ?? '—';
+    document.getElementById('currentPath').textContent = data.host_save_path || '—';
   } catch (e) {
     document.getElementById('serverStatus').textContent = '❌ Error';
     showStatus('Failed to load config: ' + e.message, 'error');
@@ -189,20 +190,20 @@ async function loadConfig() {
 }
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
-  const path = document.getElementById('savePath').value.trim();
+  const path = document.getElementById('hostSavePath').value.trim();
   if (!path) {
-    showStatus('Save path cannot be empty', 'error');
+    showStatus('Host save path cannot be empty', 'error');
     return;
   }
   try {
     const resp = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ save_path: path })
+      body: JSON.stringify({ host_save_path: path })
     });
     const data = await resp.json();
     if (data.success) {
-      showStatus('✅ Settings saved! New files will be saved to: ' + path, 'success');
+      showStatus('✅ docker-compose.yml updated! Restart container to apply: docker compose down && docker compose up -d', 'success');
       loadConfig();
     } else {
       showStatus('❌ Error: ' + (data.error || 'Unknown error'), 'error');
@@ -244,11 +245,48 @@ def sanitize_filename(name: str) -> str:
 
 
 def count_md_files(path: Path) -> int:
-    """Count .md files in directory recursively"""
+    """Count .md files in directory"""
     try:
         return len(list(path.rglob('*.md')))
     except:
         return 0
+
+
+def list_directory(path: str) -> dict:
+    """List directories for path browser"""
+    p = Path(path)
+    if not p.exists():
+        return {'error': f'Path does not exist: {path}', 'dirs': []}
+    if not p.is_dir():
+        return {'error': f'Not a directory: {path}', 'dirs': []}
+    try:
+        dirs = sorted([
+            {'name': item.name, 'path': str(item)}
+            for item in p.iterdir()
+            if item.is_dir() and not item.name.startswith('.')
+        ], key=lambda x: x['name'].lower())
+        return {'path': str(p), 'parent': str(p.parent), 'dirs': dirs}
+    except PermissionError:
+        return {'error': f'Permission denied: {path}', 'dirs': []}
+
+
+def write_docker_compose(host_path: str):
+    """Update docker-compose.yml with new host path"""
+    compose = f'''services:
+  kb-save-server:
+    build: .
+    container_name: kb-save-server
+    restart: unless-stopped
+    ports:
+      - "${KB_PORT:-8396}:8396"
+    environment:
+      - KB_PORT=8396
+      - KB_DIR=/data/knowledge-base
+    volumes:
+      - {host_path}:/data/knowledge-base
+      - ./data/config:/data/config
+'''
+    Path('docker-compose.yml').write_text(compose, encoding='utf-8')
 
 
 def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
@@ -445,7 +483,14 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/api/config':
             config = load_config()
             config['file_count'] = count_md_files(get_save_path())
+            config['host_save_path'] = HOST_SAVE_PATH
             self._json_response(200, config)
+
+        elif self.path.startswith('/api/browsable-path'):
+            from urllib.parse import urlparse, parse_qs
+            query = parse_qs(urlparse(self.path).query)
+            path = query.get('path', ['/'])[0]
+            self._json_response(200, list_directory(path))
         elif self.path == '/' or self.path == '/settings':
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -463,13 +508,13 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length)
                 data = json.loads(body)
 
-                new_path = data.get('save_path', '').strip()
-                if not new_path:
-                    self._json_response(400, {"success": False, "error": "save_path cannot be empty"})
+                host_path = data.get('host_save_path', '').strip()
+                if not host_path:
+                    self._json_response(400, {"success": False, "error": "host_save_path cannot be empty"})
                     return
 
-                # Validate path
-                target = Path(new_path)
+                # Validate path exists or can be created
+                target = Path(host_path)
                 try:
                     target.mkdir(parents=True, exist_ok=True)
                 except Exception as e:
@@ -477,10 +522,18 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     return
 
                 config = load_config()
-                config['save_path'] = new_path
+                config['host_save_path'] = host_path
                 save_config(config)
 
-                self._json_response(200, {"success": True, "save_path": new_path})
+                # Update docker-compose.yml
+                write_docker_compose(host_path)
+
+                self._json_response(200, {
+                    "success": True,
+                    "host_save_path": host_path,
+                    "restart_required": True,
+                    "message": f"Path updated to {host_path}. Run 'docker compose down && docker compose up -d' to apply."
+                })
             except Exception as e:
                 self._json_response(500, {"success": False, "error": str(e)})
 

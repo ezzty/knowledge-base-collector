@@ -4,10 +4,11 @@ services:
     container_name: kb-save-server
     restart: unless-stopped
     ports:
-      - "${KB_PORT:-8396}:8396"
+      - "8396:8396"
     environment:
       - KB_PORT=8396
       - KB_DIR=/data/knowledge-base
+      - HOST_SAVE_PATH=/home/jin/work/knowledge-base
     volumes:
-      - ${KB_SAVE_PATH:-./data/knowledge-base}:/data/knowledge-base
+      - /home/jin/work/knowledge-base:/data/knowledge-base
       - ./data/config:/data/config
