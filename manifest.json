@@ -3,7 +3,7 @@
   "name": "Save Page to Markdown",
   "version": "1.2.0",
   "description": "Save any web page as Markdown to your self-hosted knowledge base",
-  "permissions": ["activeTab", "storage"],
+  "permissions": ["activeTab", "storage", "scripting"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Save Page to Markdown"
