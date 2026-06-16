@@ -1,9 +1,11 @@
 __pycache__/
 *.pyc
-data/
 *.zip
 .DS_Store
-store-assets/
 ._*
 .env
-docker/knowledge-base/
+
+# Runtime data (not tracked)
+server/data/
+server/knowledge-base/
+store-assets/
