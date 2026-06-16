@@ -9,4 +9,9 @@ services:
       - KB_PORT=8396
       - KB_DIR=/data/knowledge-base
     volumes:
-      - ./data/knowledge-base:/data/knowledge-base
+      # Change the left side to your desired save path
+      # Default: ./data/knowledge-base (relative to this directory)
+      # Examples:
+      #   Linux/Mac:  /home/yourname/notes:/data/knowledge-base
+      #   Windows:    C:\Users\yourname\Documents\notes:/data/knowledge-base
+      - ${KB_SAVE_PATH:-./data/knowledge-base}:/data/knowledge-base
