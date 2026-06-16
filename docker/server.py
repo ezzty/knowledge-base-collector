@@ -11,19 +11,20 @@ import http.server
 import json
 import os
 import re
+import hashlib
 import urllib.request
 import urllib.error
 from datetime import datetime
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 import markdownify
 import trafilatura
 
 PORT = int(os.environ.get('KB_PORT', 8396))
-DEFAULT_KB_DIR = os.environ.get('KB_DIR', '/data/knowledge-base')
+BASE_DIR = Path(os.environ.get('KB_DIR', '/data/knowledge-base'))
 CONFIG_FILE = Path('/data/config/config.json')
-HOST_SAVE_PATH = os.environ.get('HOST_SAVE_PATH', '')  # Host path for display in UI
 
 # Browser headers for bypassing anti-scraping
 HEADERS = {
@@ -42,7 +43,7 @@ def load_config() -> dict:
             return json.loads(CONFIG_FILE.read_text())
         except:
             pass
-    return {"save_path": DEFAULT_KB_DIR}
+    return {"subfolder": ""}
 
 
 def save_config(config: dict):
@@ -52,9 +53,15 @@ def save_config(config: dict):
 
 
 def get_save_path() -> Path:
-    """Get current save path from config"""
+    """Get current save path: BASE_DIR + subfolder from config"""
     config = load_config()
-    return Path(config.get('save_path', DEFAULT_KB_DIR))
+    subfolder = config.get('subfolder', '').strip()
+    # Sanitize subfolder: no leading/trailing slashes, no .. traversal
+    if subfolder:
+        subfolder = subfolder.replace('..', '').strip('/')
+    if subfolder:
+        return BASE_DIR / subfolder
+    return BASE_DIR
 
 
 # ==================== SETTINGS PAGE HTML ====================
@@ -147,17 +154,18 @@ SETTINGS_HTML = r"""<!DOCTYPE html>
 
   <div class="stats" id="stats">
     <div class="row"><span class="label">Status</span><span class="value" id="serverStatus">Loading...</span></div>
-    <div class="row"><span class="label">Current Path</span><span class="value" id="currentPath">—</span></div>
+    <div class="row"><span class="label">Base Directory</span><span class="value" id="basePath">/data/knowledge-base</span></div>
+    <div class="row"><span class="label">Save Path</span><span class="value" id="currentPath">—</span></div>
     <div class="row"><span class="label">Files Saved</span><span class="value" id="fileCount">—</span></div>
   </div>
 
   <div class="field">
-    <label>Host Save Path</label>
-    <input type="text" id="hostSavePath" placeholder="/home/yourname/notes">
-    <div class="hint">Absolute path on the HOST machine where Markdown files will be saved. This updates docker-compose.yml — restart the container after saving.</div>
+    <label>Subfolder (optional)</label>
+    <input type="text" id="subfolder" placeholder="e.g. tech/articles or 我的收藏">
+    <div class="hint">Subfolder within the base directory. Leave empty to save directly to the base directory. Changes take effect immediately — no restart needed.</div>
   </div>
 
-  <button class="btn btn-primary" id="saveBtn">💾 Save & Update docker-compose.yml</button>
+  <button class="btn btn-primary" id="saveBtn">💾 Save</button>
   <button class="btn btn-secondary" id="testBtn">🔗 Test Connection</button>
 
   <div class="status" id="status"></div>
@@ -169,20 +177,11 @@ SETTINGS_HTML = r"""<!DOCTYPE html>
 <details style="margin-top:24px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 32px;color:var(--text)">
   <summary style="cursor:pointer;font-weight:700;font-size:16px;color:var(--accent)">📖 安装说明（中文）</summary>
 
-  <h3 style="margin-top:20px;color:var(--accent)">⚠️ 最重要的事：Docker 卷映射</h3>
-  <p>Docker 容器和你的宿主机是<strong>完全隔离</strong>的。容器内的 <code>/data/knowledge-base</code> 路径 ≠ 你电脑上的路径。</p>
-  <p>你<strong>必须</strong>在 <code>docker-compose.yml</code> 里配置 <strong>volumes（卷映射）</strong>，把容器路径映射到你宿主机的真实目录。</p>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code># 你的宿主机目录    容器内目录
-volumes:
-  - /home/你的名字/notes:/data/knowledge-base</code></pre>
-
   <h3 style="margin-top:20px;color:var(--accent)">🚀 快速安装</h3>
   <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>git clone https://github.com/ezzty/knowledge-base-collector.git
-cd knowledge-base-collector/docker</code></pre>
-  <p><strong>编辑 <code>docker-compose.yml</code></strong> — 把 volumes 改成你的真实路径：</p>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>volumes:
-  - /你的真实路径:/data/knowledge-base   ← 必须改！</code></pre>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose up -d</code></pre>
+cd knowledge-base-collector/docker
+docker compose up -d</code></pre>
+  <p>Markdown 文件默认保存在 <code>./knowledge-base/</code> 目录（与 docker-compose.yml 同级）。</p>
 
   <h3 style="margin-top:20px;color:var(--accent)">🔧 安装 Chrome 插件</h3>
   <ol>
@@ -198,51 +197,19 @@ cd knowledge-base-collector/docker</code></pre>
     <li>点"测试连接"确认正常 → 保存</li>
   </ol>
 
-  <h3 style="margin-top:20px;color:var(--accent)">🌐 网页端修改保存路径</h3>
-  <p>访问 <code>http://服务器IP:8396/</code> 可以在网页上直接修改保存路径。</p>
-  <p style="color:#f87171;font-weight:700">⚠️ 修改后必须重启容器才能生效！</p>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose down
-docker compose up -d</code></pre>
-  <p>不重启的话，文件还是会保存到旧路径。</p>
-
-  <h3 style="margin-top:20px;color:var(--accent)">💡 两种方式改路径</h3>
-  <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:13px">
-    <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px;font-weight:600">方式</td>
-      <td style="padding:8px;font-weight:600">改什么</td>
-      <td style="padding:8px;font-weight:600">要不要重启</td>
-    </tr>
-    <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px">网页 UI</td>
-      <td style="padding:8px">自动改 docker-compose.yml</td>
-      <td style="padding:8px;color:#f87171;font-weight:700">要！</td>
-    </tr>
-    <tr>
-      <td style="padding:8px">手动编辑</td>
-      <td style="padding:8px">直接改 docker-compose.yml</td>
-      <td style="padding:8px;color:#f87171;font-weight:700">要！</td>
-    </tr>
-  </table>
-  <p style="color:var(--sub);font-size:12px">不管用哪种方式改路径，都必须 <code>docker compose down && docker compose up -d</code> 重启容器。</p>
+  <h3 style="margin-top:20px;color:var(--accent)">🌐 网页端修改保存子目录</h3>
+  <p>访问 <code>http://服务器IP:8396/</code> 可以在网页上直接修改保存子目录。</p>
+  <p style="color:var(--sub);font-size:12px">子目录修改后<strong>立即生效</strong>，无需重启容器。留空则保存到根目录。</p>
 </details>
 
 <details style="margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 32px;color:var(--text)">
   <summary style="cursor:pointer;font-weight:700;font-size:16px;color:var(--accent)">📖 Installation Guide (English)</summary>
 
-  <h3 style="margin-top:20px;color:var(--accent)">⚠️ IMPORTANT: Docker Volume Mapping</h3>
-  <p>Docker containers are <strong>completely isolated</strong> from your host machine. The path <code>/data/knowledge-base</code> inside the container is <strong>NOT</strong> the same as a path on your computer.</p>
-  <p>You <strong>MUST</strong> configure <strong>volumes</strong> in <code>docker-compose.yml</code> to map the container path to a real directory on your host machine.</p>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code># Your host directory      Container directory
-volumes:
-  - /home/yourname/notes:/data/knowledge-base</code></pre>
-
   <h3 style="margin-top:20px;color:var(--accent)">🚀 Quick Start</h3>
   <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>git clone https://github.com/ezzty/knowledge-base-collector.git
-cd knowledge-base-collector/docker</code></pre>
-  <p><strong>Edit <code>docker-compose.yml</code></strong> — change volumes to your actual path:</p>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>volumes:
-  - /your/actual/path:/data/knowledge-base   ← CHANGE THIS!</code></pre>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose up -d</code></pre>
+cd knowledge-base-collector/docker
+docker compose up -d</code></pre>
+  <p>Markdown files are saved to <code>./knowledge-base/</code> by default (same directory as docker-compose.yml).</p>
 
   <h3 style="margin-top:20px;color:var(--accent)">🔧 Install Chrome Extension</h3>
   <ol>
@@ -258,32 +225,9 @@ cd knowledge-base-collector/docker</code></pre>
     <li>Click "Test Connection" to verify → Save</li>
   </ol>
 
-  <h3 style="margin-top:20px;color:var(--accent)">🌐 Change Save Path via Web UI</h3>
-  <p>Visit <code>http://your-server:8396/</code> to change the save path in your browser.</p>
-  <p style="color:#f87171;font-weight:700">⚠️ You MUST restart the container after changing the path!</p>
-  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose down
-docker compose up -d</code></pre>
-  <p>Without restarting, files will still be saved to the old path.</p>
-
-  <h3 style="margin-top:20px;color:var(--accent)">💡 Two Ways to Change Path</h3>
-  <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:13px">
-    <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px;font-weight:600">Method</td>
-      <td style="padding:8px;font-weight:600">What Changes</td>
-      <td style="padding:8px;font-weight:600">Restart Required?</td>
-    </tr>
-    <tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px">Web UI</td>
-      <td style="padding:8px">Auto-updates docker-compose.yml</td>
-      <td style="padding:8px;color:#f87171;font-weight:700">YES!</td>
-    </tr>
-    <tr>
-      <td style="padding:8px">Manual Edit</td>
-      <td style="padding:8px">Edit docker-compose.yml directly</td>
-      <td style="padding:8px;color:#f87171;font-weight:700">YES!</td>
-    </tr>
-  </table>
-  <p style="color:var(--sub);font-size:12px">Either way, you must run <code>docker compose down && docker compose up -d</code> to restart.</p>
+  <h3 style="margin-top:20px;color:var(--accent)">🌐 Change Save Subfolder via Web UI</h3>
+  <p>Visit <code>http://your-server:8396/</code> to change the save subfolder in your browser.</p>
+  <p style="color:var(--sub);font-size:12px">Changes take effect <strong>immediately</strong> — no restart needed. Leave empty to save to the root directory.</p>
 </details>
 </div>
 
@@ -299,10 +243,10 @@ async function loadConfig() {
   try {
     const resp = await fetch('/api/config');
     const data = await resp.json();
-    document.getElementById('hostSavePath').value = data.host_save_path || '';
+    document.getElementById('subfolder').value = data.subfolder || '';
     document.getElementById('serverStatus').textContent = '✅ Running';
     document.getElementById('fileCount').textContent = data.file_count ?? '—';
-    document.getElementById('currentPath').textContent = data.host_save_path || '—';
+    document.getElementById('currentPath').textContent = data.save_path || '—';
   } catch (e) {
     document.getElementById('serverStatus').textContent = '❌ Error';
     showStatus('Failed to load config: ' + e.message, 'error');
@@ -310,20 +254,16 @@ async function loadConfig() {
 }
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
-  const path = document.getElementById('hostSavePath').value.trim();
-  if (!path) {
-    showStatus('Host save path cannot be empty', 'error');
-    return;
-  }
+  const subfolder = document.getElementById('subfolder').value.trim();
   try {
     const resp = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host_save_path: path })
+      body: JSON.stringify({ subfolder: subfolder })
     });
     const data = await resp.json();
     if (data.success) {
-      showStatus('✅ docker-compose.yml updated! Restart container to apply: docker compose down && docker compose up -d', 'success');
+      showStatus('✅ Save path updated! Files will be saved to: ' + data.save_path, 'success');
       loadConfig();
     } else {
       showStatus('❌ Error: ' + (data.error || 'Unknown error'), 'error');
@@ -390,26 +330,6 @@ def list_directory(path: str) -> dict:
         return {'error': f'Permission denied: {path}', 'dirs': []}
 
 
-def write_docker_compose(host_path: str):
-    """Update docker-compose.yml with new host path"""
-    port = os.environ.get('KB_PORT', '8396')
-    compose = f'''services:
-  kb-save-server:
-    build: .
-    container_name: kb-save-server
-    restart: unless-stopped
-    ports:
-      - "{port}:8396"
-    environment:
-      - KB_PORT=8396
-      - KB_DIR=/data/knowledge-base
-    volumes:
-      - {host_path}:/data/knowledge-base
-      - ./data/config:/data/config
-'''
-    Path('docker-compose.yml').write_text(compose, encoding='utf-8')
-
-
 def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
     """Convert browser-extracted HTML to Markdown"""
     try:
@@ -418,7 +338,7 @@ def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
 
         content = trafilatura.extract(
             html, url=url, output_format='markdown',
-            include_links=True, include_images=False,
+            include_links=True, include_images=True,
             include_tables=True, favor_recall=True
         )
 
@@ -466,7 +386,7 @@ def fetch_page_content(url: str) -> dict:
 
         content = trafilatura.extract(
             html, url=url, output_format='markdown',
-            include_links=True, include_images=False,
+            include_links=True, include_images=True,
             include_tables=True, favor_recall=True
         )
 
@@ -533,10 +453,69 @@ def fetch_page_content(url: str) -> dict:
         return {"error": str(e)}
 
 
+def localize_image_urls(content: str, save_dir: Path, page_url: str) -> tuple:
+    """Download images and replace URLs with local relative paths.
+    Returns (updated_content, image_count).
+    """
+    from urllib.parse import urlparse, urljoin
+    img_pattern = re.compile(r'!\[([^\]]*)\]\((https?://[^)]+)\)')
+    matches = img_pattern.findall(content)
+    if not matches:
+        return content, 0
+
+    assets_dir = save_dir / 'assets'
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+
+    def download_image(match):
+        alt, img_url = match
+        try:
+            # Build absolute URL if relative
+            if not img_url.startswith('http'):
+                img_url = urljoin(page_url, img_url)
+
+            # Generate filename from URL hash + original extension
+            url_hash = hashlib.md5(img_url.encode()).hexdigest()[:10]
+            ext = Path(urlparse(img_url).path).suffix or '.jpg'
+            # Clean extension
+            ext = ext.split('?')[0].lower()
+            if ext not in ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'):
+                ext = '.jpg'
+            local_name = f"{url_hash}{ext}"
+            local_path = assets_dir / local_name
+
+            if not local_path.exists():
+                req = urllib.request.Request(img_url, headers=HEADERS)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = resp.read()
+                    # Skip tiny images (likely tracking pixels)
+                    if len(data) < 500:
+                        return None
+                    local_path.write_bytes(data)
+
+            rel_path = f"assets/{local_name}"
+            return (f'![{alt}]({img_url})', f'![{alt}]({rel_path})')
+        except Exception:
+            return None
+
+    # Download images in parallel (max 4 threads)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(download_image, matches))
+
+    for result in results:
+        if result:
+            old, new = result
+            content = content.replace(old, new, 1)
+            count += 1
+
+    return content, count
+
+
 def save_to_knowledge_base(url: str, title: str, content: str,
                            filename: str = None, category: str = None,
-                           author: str = "", date: str = "") -> dict:
-    """Save content to knowledge base"""
+                           author: str = "", date: str = "",
+                           description: str = "", localize_images: bool = True) -> dict:
+    """Save content to knowledge base with YAML frontmatter and optional image localization"""
     kb = get_save_path()
     save_dir = kb
     if category:
@@ -563,18 +542,36 @@ def save_to_knowledge_base(url: str, title: str, content: str,
         fname = fname.replace('.md', f'-{ts}.md')
         filepath = save_dir / fname
 
-    now = datetime.now().strftime('%Y-%m-%d %H:%M')
-    md_lines = [
-        f"# {title or 'Untitled'}",
-        "",
-        f"> Source: [{url}]({url})",
-    ]
-    if author:
-        md_lines.append(f"> Author: {author}")
-    if date:
-        md_lines.append(f"> Published: {date}")
-    md_lines.extend([f"> Saved: {now}", "", "---", "", content])
+    # --- P0: Image localization ---
+    image_count = 0
+    if localize_images:
+        content, image_count = localize_image_urls(content, save_dir, url)
 
+    # --- P0: YAML Frontmatter ---
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    safe_title = (title or 'Untitled').replace('"', '\\"')
+    safe_author = author.replace('"', '\\"') if author else ''
+    safe_desc = description.replace('"', '\\"')[:200] if description else ''
+
+    frontmatter = [
+        "---",
+        f'title: "{safe_title}"',
+        f'source_url: "{url}"',
+        f'saved_date: "{now}"',
+    ]
+    if safe_author:
+        frontmatter.append(f'author: "{safe_author}"')
+    if date:
+        frontmatter.append(f'date: "{date}"')
+    if category:
+        frontmatter.append(f'category: "{category}"')
+    if safe_desc:
+        frontmatter.append(f'description: "{safe_desc}"')
+    if image_count > 0:
+        frontmatter.append(f"images_localized: {image_count}")
+    frontmatter.append("---")
+
+    md_lines = frontmatter + ["", f"# {title or 'Untitled'}", "", content]
     filepath.write_text("\n".join(md_lines), encoding='utf-8')
 
     rel_path = filepath.relative_to(kb)
@@ -604,7 +601,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == '/api/config':
             config = load_config()
             config['file_count'] = count_md_files(get_save_path())
-            config['host_save_path'] = HOST_SAVE_PATH
+            config['save_path'] = str(get_save_path())
+            config['base_dir'] = str(BASE_DIR)
             self._json_response(200, config)
 
         elif self.path.startswith('/api/browsable-path'):
@@ -629,31 +627,22 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length)
                 data = json.loads(body)
 
-                host_path = data.get('host_save_path', '').strip()
-                if not host_path:
-                    self._json_response(400, {"success": False, "error": "host_save_path cannot be empty"})
-                    return
-
-                # Validate path exists or can be created
-                target = Path(host_path)
-                try:
-                    target.mkdir(parents=True, exist_ok=True)
-                except Exception as e:
-                    self._json_response(400, {"success": False, "error": f"Cannot create directory: {e}"})
-                    return
+                subfolder = data.get('subfolder', '').strip()
+                # Sanitize: no .. traversal
+                subfolder = subfolder.replace('..', '').strip('/')
 
                 config = load_config()
-                config['host_save_path'] = host_path
+                config['subfolder'] = subfolder
                 save_config(config)
 
-                # Update docker-compose.yml
-                write_docker_compose(host_path)
+                save_path = get_save_path()
+                save_path.mkdir(parents=True, exist_ok=True)
 
                 self._json_response(200, {
                     "success": True,
-                    "host_save_path": host_path,
-                    "restart_required": True,
-                    "message": f"Path updated to {host_path}. Run 'docker compose down && docker compose up -d' to apply."
+                    "subfolder": subfolder,
+                    "save_path": str(save_path),
+                    "message": f"Save path updated to {save_path}"
                 })
             except Exception as e:
                 self._json_response(500, {"success": False, "error": str(e)})
@@ -690,7 +679,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                 save_result = save_to_knowledge_base(
                     url=url, title=title, content=result['content'],
                     filename=filename, category=category,
-                    author=result.get('author', ''), date=result.get('date', '')
+                    author=result.get('author', ''), date=result.get('date', ''),
+                    description=result.get('description', '')
                 )
 
                 self._json_response(200, save_result)

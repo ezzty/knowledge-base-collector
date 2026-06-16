@@ -6,3 +6,4 @@ data/
 store-assets/
 ._*
 .env
+docker/knowledge-base/

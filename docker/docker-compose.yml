@@ -1,6 +1,10 @@
 services:
   kb-save-server:
-    build: .
+    build:
+      context: .
+      args:
+        UID: "1000"
+        GID: "1000"
     container_name: kb-save-server
     restart: unless-stopped
     ports:
@@ -8,7 +12,6 @@ services:
     environment:
       - KB_PORT=8396
       - KB_DIR=/data/knowledge-base
-      - HOST_SAVE_PATH=/home/jin/work/knowledge-base
     volumes:
-      - /home/jin/work/knowledge-base:/data/knowledge-base
+      - ./knowledge-base:/data/knowledge-base
       - ./data/config:/data/config
