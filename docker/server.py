@@ -225,6 +225,66 @@ docker compose up -d</code></pre>
   </table>
   <p style="color:var(--sub);font-size:12px">不管用哪种方式改路径，都必须 <code>docker compose down && docker compose up -d</code> 重启容器。</p>
 </details>
+
+<details style="margin-top:16px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 32px;color:var(--text)">
+  <summary style="cursor:pointer;font-weight:700;font-size:16px;color:var(--accent)">📖 Installation Guide (English)</summary>
+
+  <h3 style="margin-top:20px;color:var(--accent)">⚠️ IMPORTANT: Docker Volume Mapping</h3>
+  <p>Docker containers are <strong>completely isolated</strong> from your host machine. The path <code>/data/knowledge-base</code> inside the container is <strong>NOT</strong> the same as a path on your computer.</p>
+  <p>You <strong>MUST</strong> configure <strong>volumes</strong> in <code>docker-compose.yml</code> to map the container path to a real directory on your host machine.</p>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code># Your host directory      Container directory
+volumes:
+  - /home/yourname/notes:/data/knowledge-base</code></pre>
+
+  <h3 style="margin-top:20px;color:var(--accent)">🚀 Quick Start</h3>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>git clone https://github.com/ezzty/knowledge-base-collector.git
+cd knowledge-base-collector/docker</code></pre>
+  <p><strong>Edit <code>docker-compose.yml</code></strong> — change volumes to your actual path:</p>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>volumes:
+  - /your/actual/path:/data/knowledge-base   ← CHANGE THIS!</code></pre>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose up -d</code></pre>
+
+  <h3 style="margin-top:20px;color:var(--accent)">🔧 Install Chrome Extension</h3>
+  <ol>
+    <li>Install from <a href="https://chrome.google.com/webstore/detail/enjnfcibloffgkmbachgbpmkidjhapgm" target="_blank">Chrome Web Store</a>, or</li>
+    <li>Download zip from <a href="https://github.com/ezzty/knowledge-base-collector/releases" target="_blank">GitHub Releases</a> and load manually:
+      <br>Chrome → <code>chrome://extensions/</code> → Enable "Developer mode" → "Load unpacked"</li>
+  </ol>
+
+  <h3 style="margin-top:20px;color:var(--accent)">⚙️ Configure Extension</h3>
+  <ol>
+    <li>Click extension icon → ⚙️ Settings (top right)</li>
+    <li>Enter server address, e.g. <code>http://192.168.1.100:8396</code></li>
+    <li>Click "Test Connection" to verify → Save</li>
+  </ol>
+
+  <h3 style="margin-top:20px;color:var(--accent)">🌐 Change Save Path via Web UI</h3>
+  <p>Visit <code>http://your-server:8396/</code> to change the save path in your browser.</p>
+  <p style="color:#f87171;font-weight:700">⚠️ You MUST restart the container after changing the path!</p>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose down
+docker compose up -d</code></pre>
+  <p>Without restarting, files will still be saved to the old path.</p>
+
+  <h3 style="margin-top:20px;color:var(--accent)">💡 Two Ways to Change Path</h3>
+  <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:13px">
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px;font-weight:600">Method</td>
+      <td style="padding:8px;font-weight:600">What Changes</td>
+      <td style="padding:8px;font-weight:600">Restart Required?</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px">Web UI</td>
+      <td style="padding:8px">Auto-updates docker-compose.yml</td>
+      <td style="padding:8px;color:#f87171;font-weight:700">YES!</td>
+    </tr>
+    <tr>
+      <td style="padding:8px">Manual Edit</td>
+      <td style="padding:8px">Edit docker-compose.yml directly</td>
+      <td style="padding:8px;color:#f87171;font-weight:700">YES!</td>
+    </tr>
+  </table>
+  <p style="color:var(--sub);font-size:12px">Either way, you must run <code>docker compose down && docker compose up -d</code> to restart.</p>
+</details>
 </div>
 
 <script>
