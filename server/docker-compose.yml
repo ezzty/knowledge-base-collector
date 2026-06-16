@@ -13,6 +13,6 @@ services:
       - KB_PORT=8396
       - KB_DIR=/data/knowledge-base
     volumes:
-      - ./knowledge-base:/data/knowledge-base
+      - /work/knowledge-base:/data/knowledge-base
       - ./data/config:/data/config
       - ./docker-compose.yml:/app/docker-compose.yml
