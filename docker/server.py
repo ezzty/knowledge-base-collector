@@ -272,13 +272,14 @@ def list_directory(path: str) -> dict:
 
 def write_docker_compose(host_path: str):
     """Update docker-compose.yml with new host path"""
+    port = os.environ.get('KB_PORT', '8396')
     compose = f'''services:
   kb-save-server:
     build: .
     container_name: kb-save-server
     restart: unless-stopped
     ports:
-      - "${KB_PORT:-8396}:8396"
+      - "{port}:8396"
     environment:
       - KB_PORT=8396
       - KB_DIR=/data/knowledge-base
