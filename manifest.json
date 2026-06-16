@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "知识库收藏",
+  "version": "1.2.0",
+  "description": "一键保存网页为 Markdown 到本地知识库",
+  "permissions": ["activeTab", "storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "保存到知识库"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

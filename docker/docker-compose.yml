@@ -1,0 +1,12 @@
+services:
+  kb-save-server:
+    build: .
+    container_name: kb-save-server
+    restart: unless-stopped
+    ports:
+      - "${KB_PORT:-8396}:8396"
+    environment:
+      - KB_PORT=8396
+      - KB_DIR=/data/knowledge-base
+    volumes:
+      - ./data/knowledge-base:/data/knowledge-base

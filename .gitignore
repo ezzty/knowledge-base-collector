@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+*.zip
+.DS_Store
+store-assets/
+._*
