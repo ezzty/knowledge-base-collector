@@ -154,18 +154,25 @@ SETTINGS_HTML = r"""<!DOCTYPE html>
 
   <div class="stats" id="stats">
     <div class="row"><span class="label">Status</span><span class="value" id="serverStatus">Loading...</span></div>
-    <div class="row"><span class="label">Base Directory</span><span class="value" id="basePath">/data/knowledge-base</span></div>
+    <div class="row"><span class="label">Host Directory</span><span class="value" id="hostDir">—</span></div>
     <div class="row"><span class="label">Save Path</span><span class="value" id="currentPath">—</span></div>
     <div class="row"><span class="label">Files Saved</span><span class="value" id="fileCount">—</span></div>
   </div>
 
   <div class="field">
-    <label>Subfolder (optional)</label>
-    <input type="text" id="subfolder" placeholder="e.g. tech/articles or 我的收藏">
-    <div class="hint">Subfolder within the base directory. Leave empty to save directly to the base directory. Changes take effect immediately — no restart needed.</div>
+    <label>Host Directory</label>
+    <input type="text" id="hostDirInput" placeholder="./knowledge-base">
+    <div class="hint">Directory on the host machine where files are saved. ⚠️ Changing this requires container restart.</div>
   </div>
 
-  <button class="btn btn-primary" id="saveBtn">💾 Save</button>
+  <div class="field">
+    <label>Subfolder (optional)</label>
+    <input type="text" id="subfolder" placeholder="e.g. tech/articles or 我的收藏">
+    <div class="hint">Subfolder within the host directory. Leave empty to save directly to the root. Changes take effect immediately.</div>
+  </div>
+
+  <button class="btn btn-primary" id="saveBtn">💾 Save Subfolder</button>
+  <button class="btn btn-secondary" id="saveHostDirBtn" style="background:#475569">📁 Change Host Directory & Restart</button>
   <button class="btn btn-secondary" id="testBtn">🔗 Test Connection</button>
 
   <div class="status" id="status"></div>
@@ -247,6 +254,8 @@ async function loadConfig() {
     document.getElementById('serverStatus').textContent = '✅ Running';
     document.getElementById('fileCount').textContent = data.file_count ?? '—';
     document.getElementById('currentPath').textContent = data.save_path || '—';
+    document.getElementById('hostDir').textContent = data.host_dir || '—';
+    document.getElementById('hostDirInput').value = data.host_dir || '';
   } catch (e) {
     document.getElementById('serverStatus').textContent = '❌ Error';
     showStatus('Failed to load config: ' + e.message, 'error');
@@ -270,6 +279,31 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
     }
   } catch (e) {
     showStatus('❌ Failed to save: ' + e.message, 'error');
+  }
+});
+
+document.getElementById('saveHostDirBtn').addEventListener('click', async () => {
+  const hostDir = document.getElementById('hostDirInput').value.trim();
+  if (!hostDir) {
+    showStatus('Host directory cannot be empty', 'error');
+    return;
+  }
+  if (!confirm('⚠️ Changing host directory requires container restart. Files in the old directory won\'t move automatically. Continue?')) return;
+  try {
+    const resp = await fetch('/api/host-dir', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host_dir: hostDir })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showStatus('✅ docker-compose.yml updated! Restart the container: docker compose down && docker compose up -d', 'success');
+      loadConfig();
+    } else {
+      showStatus('❌ Error: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (e) {
+    showStatus('❌ Failed: ' + e.message, 'error');
   }
 });
 
@@ -328,6 +362,44 @@ def list_directory(path: str) -> dict:
         return {'path': str(p), 'parent': str(p.parent), 'dirs': dirs}
     except PermissionError:
         return {'error': f'Permission denied: {path}', 'dirs': []}
+
+
+COMPOSE_FILE = Path('/app/docker-compose.yml')
+
+def get_host_dir() -> str:
+    """Read current host directory from docker-compose.yml"""
+    try:
+        if COMPOSE_FILE.exists():
+            content = COMPOSE_FILE.read_text()
+            # Match volume line: - ./something:/data/knowledge-base
+            for line in content.splitlines():
+                line = line.strip()
+                if line.startswith('-') and ':/data/knowledge-base' in line:
+                    return line.lstrip('- ').split(':')[0].strip()
+    except Exception:
+        pass
+    return './knowledge-base'
+
+
+def update_host_dir(new_host_dir: str) -> dict:
+    """Update docker-compose.yml host volume mapping. User must restart container."""
+    try:
+        if not COMPOSE_FILE.exists():
+            return {'error': 'docker-compose.yml not found'}
+        content = COMPOSE_FILE.read_text()
+        lines = content.splitlines()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('-') and ':/data/knowledge-base' in stripped:
+                indent = line[:len(line) - len(line.lstrip())]
+                new_lines.append(f'{indent}- {new_host_dir}:/data/knowledge-base')
+            else:
+                new_lines.append(line)
+        COMPOSE_FILE.write_text('\n'.join(new_lines) + '\n')
+        return {'success': True, 'host_dir': new_host_dir, 'restart_required': True}
+    except Exception as e:
+        return {'error': str(e)}
 
 
 def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
@@ -603,6 +675,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             config['file_count'] = count_md_files(get_save_path())
             config['save_path'] = str(get_save_path())
             config['base_dir'] = str(BASE_DIR)
+            config['host_dir'] = get_host_dir()
             self._json_response(200, config)
 
         elif self.path.startswith('/api/browsable-path'):
@@ -644,6 +717,23 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     "save_path": str(save_path),
                     "message": f"Save path updated to {save_path}"
                 })
+            except Exception as e:
+                self._json_response(500, {"success": False, "error": str(e)})
+
+        elif self.path == '/api/host-dir':
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length)
+                data = json.loads(body)
+                host_dir = data.get('host_dir', '').strip()
+                if not host_dir:
+                    self._json_response(400, {"success": False, "error": "host_dir cannot be empty"})
+                    return
+                result = update_host_dir(host_dir)
+                if 'error' in result:
+                    self._json_response(500, {"success": False, "error": result['error']})
+                else:
+                    self._json_response(200, result)
             except Exception as e:
                 self._json_response(500, {"success": False, "error": str(e)})
 
