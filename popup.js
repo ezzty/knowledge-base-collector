@@ -21,6 +21,48 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
   window.location.href = 'settings.html';
 });
 
+// Content extraction function (injected into the page)
+function extractPageContent() {
+  const selectors = [
+    'article', '.post-content', '.article-content', '.entry-content',
+    '.content', '.post-body', '#content', '.t_f', '.t_msgfontfix',
+    'main', '.main-content'
+  ];
+
+  let contentHtml = '';
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.innerText.trim().length > 100) {
+      contentHtml = el.innerHTML;
+      break;
+    }
+  }
+  if (!contentHtml) {
+    contentHtml = document.body.innerHTML;
+  }
+
+  const meta = {};
+  document.querySelectorAll('meta').forEach(m => {
+    if (m.name === 'author') meta.author = m.content;
+    if (m.name === 'description') meta.description = m.content;
+    if (m.property === 'og:title') meta.ogTitle = m.content;
+    if (m.property === 'og:description') meta.ogDescription = m.content;
+  });
+
+  const timeEl = document.querySelector('time, .publish-date, .post-date, [datetime]');
+  if (timeEl) {
+    meta.date = timeEl.getAttribute('datetime') || timeEl.textContent.trim();
+  }
+
+  return {
+    success: true,
+    html: contentHtml,
+    title: document.title,
+    url: window.location.href,
+    meta: meta
+  };
+}
+
 // Save button
 document.getElementById('saveBtn').addEventListener('click', async () => {
   const btn = document.getElementById('saveBtn');
@@ -44,25 +86,22 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       category: category || null
     };
 
-    // Browser-side content extraction (bypasses WAF)
+    // Browser-side content extraction using chrome.scripting (activeTab)
     try {
-      const extracted = await new Promise((resolve, reject) => {
-        chrome.tabs.sendMessage(tab.id, { action: 'extractContent' }, (response) => {
-          if (chrome.runtime.lastError) {
-            reject(new Error(chrome.runtime.lastError.message));
-          } else if (response && response.success) {
-            resolve(response);
-          } else {
-            reject(new Error(response?.error || 'Extraction failed'));
-          }
-        });
+      const [result] = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: extractPageContent
       });
 
-      status.textContent = 'Converting to Markdown...';
-      payload.html = extracted.html;
-      payload.meta = extracted.meta || {};
+      if (result?.result?.success) {
+        status.textContent = 'Converting to Markdown...';
+        payload.html = result.result.html;
+        payload.meta = result.result.meta || {};
+      } else {
+        throw new Error(result?.result?.error || 'Extraction failed');
+      }
     } catch (e) {
-      console.log('Content script unavailable, using server-side fetch:', e.message);
+      console.log('Content extraction unavailable, using server-side fetch:', e.message);
       status.textContent = 'Fetching page from server...';
     }
 
@@ -80,7 +119,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       btn.textContent = '✅ Saved!';
       setTimeout(() => {
         btn.disabled = false;
-        btn.textContent = '💾 Save to Knowledge Base';
+        btn.textContent = '💾 Save to Markdown';
       }, 3000);
     } else {
       throw new Error(data.error || 'Save failed');
