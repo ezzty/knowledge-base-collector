@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Knowledge Base Collector</title>
+  <meta name="robots" content="index, follow">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --text-sub: #555;
+      --accent: #2563eb;
+      --accent-light: #dbeafe;
+      --border: #e5e7eb;
+      --card-bg: #f9fafb;
+      --code-bg: #f1f5f9;
+    }
+    html.dark {
+      --bg: #0f172a;
+      --text: #e2e8f0;
+      --text-sub: #94a3b8;
+      --accent: #3b82f6;
+      --accent-light: #1e3a5f;
+      --border: #334155;
+      --card-bg: #1e293b;
+      --code-bg: #1e293b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 60px 20px 80px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    .header .date { font-size: 14px; color: var(--text-sub); }
+    h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    p { margin: 12px 0; font-size: 15px; }
+    ul, ol { margin: 12px 0; padding-left: 24px; }
+    li { margin: 8px 0; font-size: 15px; }
+    code {
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: 'SF Mono', Monaco, Consolas, monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+    .highlight-box {
+      background: var(--accent-light);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 20px 0;
+    }
+    .highlight-box p { margin: 0; font-weight: 500; }
+    .footer {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 14px;
+      color: var(--text-sub);
+    }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    .theme-toggle {
+      position: fixed; top: 20px; right: 20px;
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; font-size: 18px;
+      cursor: pointer; z-index: 100;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+    th { background: var(--card-bg); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">🌙</button>
+
+  <div class="container">
+    <div class="header">
+      <h1>🔒 Privacy Policy</h1>
+      <p class="date">Last updated: June 16, 2026</p>
+    </div>
+
+    <div class="highlight-box">
+      <p>🔒 <strong>This extension does not collect, store, or transmit any personal data to third parties.</strong> All data is saved exclusively to your own self-hosted server. No analytics, no tracking, no telemetry.</p>
+    </div>
+
+    <h2>1. Overview</h2>
+    <p><strong>Knowledge Base Collector</strong> ("the Extension") is a Chrome browser extension that allows you to save web pages as Markdown documents to your own self-hosted knowledge base server. This Privacy Policy explains how the Extension handles user data.</p>
+
+    <h2>2. Data Collection</h2>
+    <p>The Extension <strong>does not collect any personal data</strong>. Specifically, it does not:</p>
+    <ul>
+      <li>Collect, store, or transmit browsing history</li>
+      <li>Track user behavior or analytics</li>
+      <li>Share data with third-party services</li>
+      <li>Use cookies or similar tracking technologies</li>
+      <li>Include any third-party scripts, trackers, or advertising</li>
+      <li>Phone home or contact any server other than your own</li>
+    </ul>
+
+    <h2>3. How Data Flows</h2>
+    <p>When you click "Save", the Extension:</p>
+    <ol>
+      <li>Extracts the visible article content from the current web page (in your browser)</li>
+      <li>Sends the extracted HTML to <strong>your own server</strong> at the address you configured</li>
+      <li>Your server converts the HTML to Markdown and saves it as a local file</li>
+    </ol>
+    <p><strong>No data is sent to us, to Google, or to any third party.</strong> The only network communication is between your browser and your own self-hosted server.</p>
+
+    <h2>4. Local Storage</h2>
+    <p>The Extension uses Chrome's <code>chrome.storage.sync</code> API to save:</p>
+    <ul>
+      <li><strong>Server URL</strong> — The address of your self-hosted backend (e.g., <code>http://192.168.1.100:8396</code>)</li>
+    </ul>
+    <p>This data is stored locally on your device and synced across your Chrome browsers via your Google account. It is never transmitted to us.</p>
+
+    <h2>5. Permissions Used</h2>
+    <table>
+      <tr>
+        <th>Permission</th>
+        <th>Purpose</th>
+      </tr>
+      <tr>
+        <td><code>activeTab</code></td>
+        <td>Access the current tab's title and URL when you click the extension icon. Only accesses the tab you are actively viewing, and only at the moment of interaction.</td>
+      </tr>
+      <tr>
+        <td><code>storage</code></td>
+        <td>Save your server URL preference locally.</td>
+      </tr>
+    </table>
+
+    <h2>6. Remote Code</h2>
+    <p>The Extension does <strong>not</strong> load or execute any remote code. All JavaScript is bundled within the extension package and reviewed by the Chrome Web Store. The only network request is to <strong>your own server</strong> that you explicitly configure.</p>
+
+    <h2>7. Third-Party Services</h2>
+    <p>The Extension does not integrate with or transmit data to any third-party services, analytics platforms, advertising networks, or CDNs.</p>
+
+    <h2>8. Self-Hosted Backend</h2>
+    <p>The backend server is fully open source and designed for self-hosting. You have complete control over your data. The server:</p>
+    <ul>
+      <li>Runs on your own infrastructure (local machine, VPS, NAS, etc.)</li>
+      <li>Saves all documents as plain Markdown files on your filesystem</li>
+      <li>Does not phone home or send data to any external service</li>
+      <li>Can be audited, modified, or replaced at any time</li>
+    </ul>
+
+    <h2>9. Backend Setup (Docker)</h2>
+    <p>Deploy the backend server with Docker Compose:</p>
+    <pre><code>git clone https://github.com/ezzty/knowledge-base-collector.git
+cd knowledge-base-collector/docker
+docker compose up -d</code></pre>
+    <p>The server runs at <code>http://localhost:8396</code> by default. Knowledge base files are saved to <code>./data/knowledge-base/</code>.</p>
+
+    <h2>10. Backend Setup (Direct Python)</h2>
+    <p>Alternatively, run the server directly:</p>
+    <pre><code>pip install trafilatura markdownify readability-lxml requests
+python3 server.py</code></pre>
+    <table>
+      <tr>
+        <th>Environment Variable</th>
+        <th>Default</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td><code>KB_PORT</code></td>
+        <td><code>8396</code></td>
+        <td>Server port</td>
+      </tr>
+      <tr>
+        <td><code>KB_DIR</code></td>
+        <td><code>./knowledge-base</code></td>
+        <td>Knowledge base save path</td>
+      </tr>
+    </table>
+
+    <h2>11. Full Source Code</h2>
+    <p>The complete source code for both the extension and the backend server is available on GitHub:</p>
+    <p>🔗 <a href="https://github.com/ezzty/knowledge-base-collector" target="_blank">https://github.com/ezzty/knowledge-base-collector</a></p>
+
+    <h2>12. Children's Privacy</h2>
+    <p>The Extension does not knowingly collect any information from children under the age of 13.</p>
+
+    <h2>13. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. Changes will be reflected in the "Last updated" date at the top of this page.</p>
+
+    <h2>14. Contact</h2>
+    <p>If you have any questions about this Privacy Policy, please open an issue on GitHub:</p>
+    <ul>
+      <li>GitHub: <a href="https://github.com/ezzty/knowledge-base-collector/issues" target="_blank">github.com/ezzty/knowledge-base-collector/issues</a></li>
+      <li>Email: <a href="mailto:hi@krya.com">hi@krya.com</a></li>
+    </ul>
+
+    <div class="footer">
+      <p>&copy; 2026 Jin. All rights reserved. &nbsp;|&nbsp; <a href="https://github.com/ezzty/knowledge-base-collector" target="_blank">GitHub</a></p>
+    </div>
+  </div>
+
+  <script>
+    const toggle = document.getElementById('themeToggle');
+    const html = document.documentElement;
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark') html.classList.add('dark');
+    else if (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches) html.classList.add('dark');
+    toggle.textContent = html.classList.contains('dark') ? '☀️' : '🌙';
+    toggle.addEventListener('click', () => {
+      html.classList.toggle('dark');
+      const isDark = html.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      toggle.textContent = isDark ? '☀️' : '🌙';
+    });
+  </script>
+</body>
+</html>
