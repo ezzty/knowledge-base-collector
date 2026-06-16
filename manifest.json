@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "知识库收藏",
+  "name": "Knowledge Base Collector",
   "version": "1.2.0",
-  "description": "一键保存网页为 Markdown 到本地知识库",
+  "description": "Save any web page as Markdown to your self-hosted knowledge base",
   "permissions": ["activeTab", "storage"],
   "action": {
     "default_popup": "popup.html",

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-知识库收藏服务 - 接收 Chrome 插件发来的网页 URL，
-抓取内容转换为 Markdown 保存到知识库目录。
+Knowledge Base Collector Server - Receives web page URLs from the Chrome extension,
+fetches content, converts to Markdown, and saves to the knowledge base directory.
 
-端口: 8396
-知识库目录: ./knowledge-base/ (可通过 KB_DIR 环境变量修改)
+Port: 8396
+Knowledge base: ./knowledge-base/ (configurable via KB_DIR env var)
 """
 
 import http.server
@@ -89,7 +89,7 @@ def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
                 content = re.sub(r'\n{3,}', '\n\n', content).strip()
 
         if not content or len(content) < 30:
-            return {"error": "无法从页面提取正文内容"}
+            return {"error": "Failed to extract content from page"}
 
         return {
             "content": content,
@@ -100,7 +100,7 @@ def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
         }
 
     except Exception as e:
-        return {"error": f"HTML 转换失败: {str(e)}"}
+        return {"error": f"HTML conversion failed: {str(e)}"}
 
 
 def fetch_page_content(url: str) -> dict:
@@ -113,7 +113,7 @@ def fetch_page_content(url: str) -> dict:
         html = resp.text
 
         if not html or len(html) < 100:
-            return {"error": "页面内容为空"}
+            return {"error": "Page content is empty"}
 
         # 用 trafilatura 从 HTML 提取正文为 Markdown
         content = trafilatura.extract(
@@ -147,7 +147,7 @@ def fetch_page_content(url: str) -> dict:
             content = re.sub(r'\n{3,}', '\n\n', content).strip()
 
         if not content or len(content) < 30:
-            return {"error": "无法提取页面正文内容"}
+            return {"error": "Failed to extract page content"}
 
         # 提取元信息
         meta = {}
@@ -194,11 +194,11 @@ def fetch_page_content(url: str) -> dict:
         }
 
     except requests.HTTPError as e:
-        return {"error": f"HTTP 错误: {e.response.status_code}"}
+        return {"error": f"HTTP error: {e.response.status_code}"}
     except requests.ConnectionError:
-        return {"error": "无法连接到目标网站"}
+        return {"error": "Cannot connect to target website"}
     except requests.Timeout:
-        return {"error": "请求超时（15秒）"}
+        return {"error": "Request timed out (15 seconds)"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -283,7 +283,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({
                 "status": "ok",
-                "service": "知识库收藏服务",
+                "service": "Knowledge Base Collector",
                 "knowledge_base": str(KNOWLEDGE_BASE)
             }).encode())
         else:
@@ -310,7 +310,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             browser_meta = data.get('meta', {})  # 浏览器端提取的 meta
 
             if not url:
-                self._json_response(400, {"success": False, "error": "URL 不能为空"})
+                self._json_response(400, {"success": False, "error": "URL cannot be empty"})
                 return
 
             # 如果浏览器端已经提取了 HTML，直接用服务端转换
@@ -365,14 +365,14 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
 def main():
     from http.server import ThreadingHTTPServer
     server = ThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)
-    print(f"📚 知识库收藏服务已启动")
-    print(f"   端口: {PORT}")
-    print(f"   知识库: {KNOWLEDGE_BASE}")
-    print(f"   健康检查: http://localhost:{PORT}/health")
+    print(f"📚 Knowledge Base Collector started")
+    print(f"   Port: {PORT}")
+    print(f"   Knowledge base: {KNOWLEDGE_BASE}")
+    print(f"   Health check: http://localhost:{PORT}/health")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n服务已停止")
+        print("\nServer stopped")
         server.server_close()
 
 

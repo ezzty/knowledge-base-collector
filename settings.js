@@ -1,48 +1,48 @@
 const DEFAULT_SERVER = 'http://localhost:8396';
 const status = document.getElementById('status');
 
-// 加载已保存的设置
+// Load saved settings
 chrome.storage.sync.get(['serverUrl'], (result) => {
   document.getElementById('serverUrl').value = result.serverUrl || DEFAULT_SERVER;
 });
 
-// 返回
+// Back button
 document.getElementById('backBtn').addEventListener('click', () => {
   window.location.href = 'popup.html';
 });
 
-// 测试连接
+// Test connection
 document.getElementById('testBtn').addEventListener('click', async () => {
   const url = document.getElementById('serverUrl').value.trim().replace(/\/+$/, '');
   status.className = 'status loading';
-  status.textContent = '正在测试连接...';
+  status.textContent = 'Testing connection...';
 
   try {
     const resp = await fetch(`${url}/health`, { signal: AbortSignal.timeout(5000) });
     const data = await resp.json();
     if (data.status === 'ok') {
       status.className = 'status success';
-      status.textContent = `✅ 连接成功！服务正常运行`;
+      status.textContent = '✅ Connection successful! Server is running.';
     } else {
-      throw new Error('服务响应异常');
+      throw new Error('Unexpected server response');
     }
   } catch (err) {
     status.className = 'status error';
-    status.textContent = `❌ 连接失败: ${err.message}`;
+    status.textContent = `❌ Connection failed: ${err.message}`;
   }
 });
 
-// 保存设置
+// Save settings
 document.getElementById('saveBtn').addEventListener('click', () => {
   const url = document.getElementById('serverUrl').value.trim().replace(/\/+$/, '');
   if (!url) {
     status.className = 'status error';
-    status.textContent = '❌ 服务器地址不能为空';
+    status.textContent = '❌ Server address cannot be empty';
     return;
   }
   chrome.storage.sync.set({ serverUrl: url }, () => {
     status.className = 'status success';
-    status.textContent = '✅ 设置已保存';
+    status.textContent = '✅ Settings saved';
     setTimeout(() => { status.style.display = 'none'; }, 2000);
   });
 });

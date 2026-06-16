@@ -1,6 +1,6 @@
 const DEFAULT_SERVER = 'http://localhost:8396';
 
-// 从 storage 获取服务器地址
+// Get server URL from storage
 async function getServerUrl() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(['serverUrl'], (result) => {
@@ -16,7 +16,7 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   document.getElementById('pageUrl').textContent = tab.url;
 });
 
-// 设置按钮
+// Settings button
 document.getElementById('settingsBtn').addEventListener('click', () => {
   window.location.href = 'settings.html';
 });
@@ -32,9 +32,9 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const SERVER_URL = await getServerUrl();
 
   btn.disabled = true;
-  btn.textContent = '⏳ 保存中...';
+  btn.textContent = '⏳ Saving...';
   status.className = 'status loading';
-  status.textContent = '正在从浏览器提取页面内容...';
+  status.textContent = 'Extracting page content from browser...';
 
   try {
     let payload = {
@@ -44,7 +44,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
       category: category || null
     };
 
-    // 浏览器端提取内容（绕过 WAF）
+    // Browser-side content extraction (bypasses WAF)
     try {
       const extracted = await new Promise((resolve, reject) => {
         chrome.tabs.sendMessage(tab.id, { action: 'extractContent' }, (response) => {
@@ -53,17 +53,17 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
           } else if (response && response.success) {
             resolve(response);
           } else {
-            reject(new Error(response?.error || '提取失败'));
+            reject(new Error(response?.error || 'Extraction failed'));
           }
         });
       });
 
-      status.textContent = '正在转换为 Markdown...';
+      status.textContent = 'Converting to Markdown...';
       payload.html = extracted.html;
       payload.meta = extracted.meta || {};
     } catch (e) {
-      console.log('Content script 不可用，使用服务端抓取:', e.message);
-      status.textContent = '正在由服务端抓取页面...';
+      console.log('Content script unavailable, using server-side fetch:', e.message);
+      status.textContent = 'Fetching page from server...';
     }
 
     const resp = await fetch(`${SERVER_URL}/save`, {
@@ -76,19 +76,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
     if (data.success) {
       status.className = 'status success';
-      status.textContent = `✅ 已保存: ${data.saved_path}`;
-      btn.textContent = '✅ 保存成功';
+      status.textContent = `✅ Saved: ${data.saved_path}`;
+      btn.textContent = '✅ Saved!';
       setTimeout(() => {
         btn.disabled = false;
-        btn.textContent = '💾 保存到知识库';
+        btn.textContent = '💾 Save to Knowledge Base';
       }, 3000);
     } else {
-      throw new Error(data.error || '保存失败');
+      throw new Error(data.error || 'Save failed');
     }
   } catch (err) {
     status.className = 'status error';
-    status.textContent = `❌ 错误: ${err.message}`;
+    status.textContent = `❌ Error: ${err.message}`;
     btn.disabled = false;
-    btn.textContent = '💾 重试';
+    btn.textContent = '💾 Retry';
   }
 });
