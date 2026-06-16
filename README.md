@@ -1,23 +1,24 @@
-# 📚 知识库收藏 — Chrome Extension + Self-hosted Backend
+# Save Page to Markdown
 
-一键保存网页为 Markdown 文档到你的本地知识库。浏览器端提取内容，绕过 WAF/反爬保护。
+Save any web page as clean Markdown with one click. Self-hosted backend, no third-party data collection.
 
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/enjnfcibloffgkmbachgbpmkidjhapgm)](https://chrome.google.com/webstore/detail/enjnfcibloffgkmbachgbpmkidjhapgm)
 
-## ✨ 功能特性
+## Features
 
-- 🔖 一键保存当前网页为 Markdown
-- 🛡️ 浏览器端提取内容，绕过 WAF/反爬（Cloudflare、EdgeOne 等）
-- 📁 支持自定义分类子文件夹
-- 🏷️ 自动提取标题、作者、发布时间
-- ⚙️ 可配置后端服务器地址
-- 🐳 Docker 一键部署后端
+- **One-click save** — Click the icon, the page is instantly converted to Markdown
+- **Bypass anti-scraping** — Content is extracted in your browser, defeating Cloudflare, EdgeOne, and other WAF protections
+- **Clean Markdown output** — Automatic heading detection, link preservation, and table support
+- **Smart categorization** — Organize saved pages into custom folder categories
+- **Metadata extraction** — Captures title, author, publish date, and source URL automatically
+- **Self-hosted** — All data saved to YOUR server. No third-party cloud, no tracking, no ads
+- **Fully open source** — MIT License, both extension and backend
 
-## 🚀 快速开始
+## Quick Start
 
-### 第 1 步：部署后端服务
+### Step 1: Deploy the Backend Server
 
-**方式 A：Docker Compose（推荐）**
+**Option A: Docker Compose (Recommended)**
 
 ```bash
 git clone https://github.com/ezzty/knowledge-base-collector.git
@@ -25,67 +26,75 @@ cd knowledge-base-collector/docker
 docker compose up -d
 ```
 
-服务默认运行在 `http://localhost:8396`，知识库保存在 `./data/knowledge-base/`。
+Server runs at `http://localhost:8396`. Files saved to `./data/knowledge-base/`.
 
-**方式 B：直接运行**
+**Option B: Direct Python**
 
 ```bash
 pip install trafilatura markdownify readability-lxml requests
 python3 server.py
 ```
 
-**环境变量：**
+**Environment Variables:**
 
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `KB_PORT` | `8396` | 服务端口 |
-| `KB_DIR` | `./knowledge-base` | 知识库保存路径 |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `KB_PORT` | `8396` | Server port |
+| `KB_DIR` | `./knowledge-base` | Knowledge base save path |
 
-### 第 2 步：安装 Chrome 插件
+### Step 2: Install the Chrome Extension
 
-1. 从 [Chrome Web Store](https://chrome.google.com/webstore/detail/enjnfcibloffgkmbachgbpmkidjhapgm) 安装
-2. 或者下载 `knowledge-base-extension.zip` 解压后手动加载：
-   - 打开 Chrome → `chrome://extensions/`
-   - 打开右上角「开发者模式」
-   - 点「加载已解压的扩展程序」→ 选择解压后的文件夹
+1. Install from [Chrome Web Store](https://chrome.google.com/webstore/detail/enjnfcibloffgkmbachgbpmkidjhapgm), or
+2. Download `knowledge-base-extension.zip` and load manually:
+   - Open Chrome → `chrome://extensions/`
+   - Enable "Developer mode" (top right)
+   - Click "Load unpacked" → select the extracted folder
 
-### 第 3 步：配置服务器地址
+### Step 3: Configure the Server Address
 
-1. 点击插件图标 → 右上角 ⚙️ 设置
-2. 填入后端服务地址，如 `http://192.168.1.100:8396`
-3. 点「测试连接」确认正常
-4. 保存设置
+1. Click the extension icon → ⚙️ Settings (top right)
+2. Enter your backend server address, e.g. `http://192.168.1.100:8396`
+3. Click "Test Connection" to verify
+4. Save settings
 
-### 第 4 步：使用
+### Step 4: Use
 
-1. 浏览到想收藏的网页
-2. 点击插件图标
-3. 可选填文件名、分类
-4. 点「保存到知识库」
+1. Browse to any page you want to save
+2. Click the extension icon
+3. Optionally set a filename or category
+4. Click "Save to Markdown"
 
-## 📁 项目结构
+## Project Structure
 
 ```
-├── manifest.json          # Chrome 插件配置
-├── popup.html/js          # 插件弹窗 UI
-├── settings.html/js       # 插件设置页面
-├── content.js             # 浏览器端内容提取
+├── manifest.json          # Chrome extension config (Manifest V3)
+├── popup.html/js          # Popup UI
+├── settings.html/js       # Settings page
 ├── background.js          # Service Worker
-├── server.py              # 后端服务（直接运行版）
-├── docker/                # Docker 部署
+├── server.py              # Backend server (direct run)
+├── docker/                # Docker deployment
 │   ├── Dockerfile
 │   ├── docker-compose.yml
-│   ├── server.py          # 后端服务（Docker 版）
+│   ├── server.py          # Backend server (Docker version)
 │   └── requirements.txt
-└── icon*.png              # 插件图标
+├── privacy.html           # Privacy policy page
+└── icon*.png              # Extension icons
 ```
 
-## 🏗️ 技术栈
+## Tech Stack
 
-- **前端**: Chrome Extension Manifest V3, Chrome Storage API, Content Scripts
-- **后端**: Python HTTP Server, trafilatura, readability-lxml, markdownify
-- **部署**: Docker Compose
+- **Frontend**: Chrome Extension Manifest V3, `activeTab` + `chrome.scripting` (on-demand injection)
+- **Backend**: Python HTTP Server, trafilatura, readability-lxml, markdownify
+- **Deployment**: Docker Compose
 
-## 📝 License
+## Permissions
+
+| Permission | Reason |
+|-----------|--------|
+| `activeTab` | Access the current tab content when the user clicks the extension icon |
+| `storage` | Save the user's server URL preference locally |
+| `scripting` | Inject content extraction script on demand (only when user clicks "Save") |
+
+## License
 
 MIT
