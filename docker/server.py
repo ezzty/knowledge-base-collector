@@ -165,9 +165,8 @@ SETTINGS_HTML = r"""<!DOCTYPE html>
   <div class="footer">
     <p><a href="https://github.com/ezzty/knowledge-base-collector" target="_blank">GitHub</a> · <a href="/health" target="_blank">Health Check</a></p>
   </div>
-</div>
 
-<details style="max-width:520px;margin:20px auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 32px;color:var(--text)">
+<details style="margin-top:24px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 32px;color:var(--text)">
   <summary style="cursor:pointer;font-weight:700;font-size:16px;color:var(--accent)">📖 安装说明（中文）</summary>
 
   <h3 style="margin-top:20px;color:var(--accent)">⚠️ 最重要的事：Docker 卷映射</h3>
@@ -226,6 +225,7 @@ docker compose up -d</code></pre>
   </table>
   <p style="color:var(--sub);font-size:12px">不管用哪种方式改路径，都必须 <code>docker compose down && docker compose up -d</code> 重启容器。</p>
 </details>
+</div>
 
 <script>
 const status = document.getElementById('status');
