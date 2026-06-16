@@ -167,6 +167,66 @@ SETTINGS_HTML = r"""<!DOCTYPE html>
   </div>
 </div>
 
+<details style="max-width:520px;margin:20px auto;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 32px;color:var(--text)">
+  <summary style="cursor:pointer;font-weight:700;font-size:16px;color:var(--accent)">📖 安装说明（中文）</summary>
+
+  <h3 style="margin-top:20px;color:var(--accent)">⚠️ 最重要的事：Docker 卷映射</h3>
+  <p>Docker 容器和你的宿主机是<strong>完全隔离</strong>的。容器内的 <code>/data/knowledge-base</code> 路径 ≠ 你电脑上的路径。</p>
+  <p>你<strong>必须</strong>在 <code>docker-compose.yml</code> 里配置 <strong>volumes（卷映射）</strong>，把容器路径映射到你宿主机的真实目录。</p>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code># 你的宿主机目录    容器内目录
+volumes:
+  - /home/你的名字/notes:/data/knowledge-base</code></pre>
+
+  <h3 style="margin-top:20px;color:var(--accent)">🚀 快速安装</h3>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>git clone https://github.com/ezzty/knowledge-base-collector.git
+cd knowledge-base-collector/docker</code></pre>
+  <p><strong>编辑 <code>docker-compose.yml</code></strong> — 把 volumes 改成你的真实路径：</p>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>volumes:
+  - /你的真实路径:/data/knowledge-base   ← 必须改！</code></pre>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose up -d</code></pre>
+
+  <h3 style="margin-top:20px;color:var(--accent)">🔧 安装 Chrome 插件</h3>
+  <ol>
+    <li>从 <a href="https://chrome.google.com/webstore/detail/enjnfcibloffgkmbachgbpmkidjhapgm" target="_blank">Chrome 应用商店</a> 安装，或</li>
+    <li>从 <a href="https://github.com/ezzty/knowledge-base-collector/releases" target="_blank">GitHub Releases</a> 下载 zip 解压手动加载：
+      <br>Chrome → <code>chrome://extensions/</code> → 开启"开发者模式" → "加载已解压的扩展程序"</li>
+  </ol>
+
+  <h3 style="margin-top:20px;color:var(--accent)">⚙️ 配置插件</h3>
+  <ol>
+    <li>点击插件图标 → 右上角 ⚙️ 设置</li>
+    <li>填入服务器地址，如 <code>http://192.168.1.100:8396</code></li>
+    <li>点"测试连接"确认正常 → 保存</li>
+  </ol>
+
+  <h3 style="margin-top:20px;color:var(--accent)">🌐 网页端修改保存路径</h3>
+  <p>访问 <code>http://服务器IP:8396/</code> 可以在网页上直接修改保存路径。</p>
+  <p style="color:#f87171;font-weight:700">⚠️ 修改后必须重启容器才能生效！</p>
+  <pre style="background:var(--border);padding:12px;border-radius:8px;overflow-x:auto;font-size:13px"><code>docker compose down
+docker compose up -d</code></pre>
+  <p>不重启的话，文件还是会保存到旧路径。</p>
+
+  <h3 style="margin-top:20px;color:var(--accent)">💡 两种方式改路径</h3>
+  <table style="width:100%;border-collapse:collapse;margin:10px 0;font-size:13px">
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px;font-weight:600">方式</td>
+      <td style="padding:8px;font-weight:600">改什么</td>
+      <td style="padding:8px;font-weight:600">要不要重启</td>
+    </tr>
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px">网页 UI</td>
+      <td style="padding:8px">自动改 docker-compose.yml</td>
+      <td style="padding:8px;color:#f87171;font-weight:700">要！</td>
+    </tr>
+    <tr>
+      <td style="padding:8px">手动编辑</td>
+      <td style="padding:8px">直接改 docker-compose.yml</td>
+      <td style="padding:8px;color:#f87171;font-weight:700">要！</td>
+    </tr>
+  </table>
+  <p style="color:var(--sub);font-size:12px">不管用哪种方式改路径，都必须 <code>docker compose down && docker compose up -d</code> 重启容器。</p>
+</details>
+
 <script>
 const status = document.getElementById('status');
 
