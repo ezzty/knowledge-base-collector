@@ -187,3 +187,71 @@ Then `docker compose up -d` will use these values automatically.
 ## License
 
 MIT
+
+---
+
+## 📖 安装说明（中文）
+
+### ⚠️ 最重要的事：Docker 卷映射
+
+Docker 容器和你的宿主机是**完全隔离**的。容器内的 `/data/knowledge-base` 路径 ≠ 你电脑上的路径。
+
+你**必须**在 `docker-compose.yml` 里配置 **volumes（卷映射）**，把容器路径映射到你宿主机的真实目录。
+
+```
+# 你的宿主机目录    容器内目录
+volumes:
+  - /home/你的名字/notes:/data/knowledge-base
+```
+
+### 🚀 快速安装
+
+```bash
+git clone https://github.com/ezzty/knowledge-base-collector.git
+cd knowledge-base-collector/docker
+```
+
+**编辑 `docker-compose.yml`** — 把 volumes 改成你的真实路径：
+
+```yaml
+volumes:
+  - /你的真实路径:/data/knowledge-base   ← 必须改！
+```
+
+```bash
+docker compose up -d
+```
+
+### 🔧 安装 Chrome 插件
+
+1. 从 [Chrome 应用商店](https://chrome.google.com/webstore/detail/enjnfcibloffgkmbachgbpmkidjhapgm) 安装，或
+2. 从 [GitHub Releases](https://github.com/ezzty/knowledge-base-collector/releases) 下载 zip 解压手动加载：
+   - Chrome → `chrome://extensions/` → 开启"开发者模式" → "加载已解压的扩展程序"
+
+### ⚙️ 配置插件
+
+1. 点击插件图标 → 右上角 ⚙️ 设置
+2. 填入服务器地址，如 `http://192.168.1.100:8396`
+3. 点"测试连接"确认正常 → 保存
+
+### 🌐 网页端修改保存路径
+
+访问 `http://服务器IP:8396/` 可以在网页上直接修改保存路径。
+
+**⚠️ 修改后必须重启容器才能生效！**
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+不重启的话，文件还是会保存到旧路径。
+
+### 💡 两种方式改路径
+
+| 方式 | 改什么 | 要不要重启 |
+|------|--------|-----------|
+| 网页 UI | 自动改 docker-compose.yml | **要！** |
+| 手动编辑 | 直接改 docker-compose.yml | **要！** |
+
+不管用哪种方式改路径，都必须 `docker compose down && docker compose up -d` 重启容器。
