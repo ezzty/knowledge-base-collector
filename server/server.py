@@ -402,38 +402,132 @@ def update_host_dir(new_host_dir: str) -> dict:
         return {'error': str(e)}
 
 
-def convert_html_to_markdown(html: str, url: str, meta: dict = None) -> dict:
+def convert_html_to_markdown(html: str, url: str, meta: dict = None, site_type: str = None) -> dict:
     """Convert browser-extracted HTML to Markdown"""
     try:
         if meta is None:
             meta = {}
 
-        content = trafilatura.extract(
-            html, url=url, output_format='markdown',
-            include_links=True, include_images=True,
-            include_tables=True, favor_recall=True
-        )
-
-        if not content:
-            content = trafilatura.extract(
-                html, url=url, output_format='txt',
-                include_links=True, include_tables=True, favor_recall=True
-            )
-
-        if not content:
+        # 小红书专用处理
+        if site_type == 'xhs':
             try:
                 from readability import Document
                 doc = Document(html)
                 readable_html = doc.summary()
                 content = markdownify.markdownify(readable_html, heading_style='ATX')
-                content = re.sub(r'\n{3,}', '\n\n', content).strip()
+                content = re.sub(r'\n{4,}', '\n\n\n', content)
             except:
                 content = markdownify.markdownify(html, heading_style='ATX')
-                content = re.sub(r'\n{3,}', '\n\n', content).strip()
+                content = re.sub(r'\n{4,}', '\n\n\n', content)
+        else:
+            # 通用处理
+            content = trafilatura.extract(
+                html, url=url, output_format='markdown',
+                include_links=True, include_images=True,
+                include_tables=True, favor_recall=True
+            )
+
+            if not content:
+                content = trafilatura.extract(
+                    html, url=url, output_format='txt',
+                    include_links=True, include_tables=True, favor_recall=True
+                )
+
+            if not content:
+                try:
+                    from readability import Document
+                    doc = Document(html)
+                    readable_html = doc.summary()
+                    content = markdownify.markdownify(readable_html, heading_style='ATX')
+                    content = re.sub(r'\n{3,}', '\n\n', content).strip()
+                except:
+                    content = markdownify.markdownify(html, heading_style='ATX')
+                    content = re.sub(r'\n{3,}', '\n\n', content).strip()
 
         if not content or len(content) < 30:
             return {"error": "Failed to extract content from page"}
 
+        # 通用图片兜底逻辑（针对 Hugo 等使用 gallery-image 的网站）
+        img_count_in_content = content.count('![')
+        if img_count_in_content < 2:
+            try:
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                fallback_images = []
+                # 优先提取 class 包含 gallery-image 的图片
+                for img in soup.find_all('img', class_=lambda x: x and 'gallery-image' in x):
+                    src = img.get('src') or img.get('data-src') or img.get('data-original')
+                    if src and not any(x in src.lower() for x in ['avatar', 'icon', 'logo']):
+                        fallback_images.append(f'![图片]({src})')
+                
+                # 如果还是没有，再兜底提取所有大图
+                if not fallback_images:
+                    for img in soup.find_all('img'):
+                        src = img.get('src') or img.get('data-src') or img.get('data-original')
+                        if src and not any(x in src.lower() for x in ['avatar', 'icon', 'logo', 'emoji']):
+                            # 简单过滤小图标
+                            if 'width' in str(img) or 'height' in str(img):
+                                w = img.get('width') or img.get('data-width')
+                                if w and int(w) < 100:
+                                    continue
+                            fallback_images.append(f'![图片]({src})')
+                
+                if fallback_images:
+                    content += '
+
+## 图片
+
+' + '
+'.join(fallback_images)
+            except Exception as e:
+                # 如果 BeautifulSoup 不可用，回退到正则
+                try:
+                    img_pattern = r'<img[^>]+(?:src|data-src)=["\']([^"\']+)["\'][^>]*>'
+                    img_urls = re.findall(img_pattern, html)
+                    fallback_images = [f'![图片]({url})' for url in img_urls 
+                                       if not any(x in url.lower() for x in ['avatar','icon','logo'])]
+                    if fallback_images:
+                        content += '
+
+## 图片
+
+' + '
+'.join(fallback_images)
+                except:
+                    pass
+
+        # 小红书图片处理 - 转为标准 Markdown 格式，后续自动本地化
+        if site_type == 'xhs' and meta.get('images'):
+            image_md = '\n\n## 图片\n\n'
+            for img_url in meta['images']:
+                image_md += f'![图片]({img_url})\n\n'
+            content += image_md
+
+        # Reddit 特殊处理
+        if site_type == 'reddit' and meta.get('images'):
+            image_md = '\n\n## 图片\n\n'
+            for img_url in meta['images']:
+                image_md += f'![图片]({img_url})\n\n'
+            content += image_md
+
+        # V2EX 特殊处理
+        if site_type == 'v2ex' and meta.get('images'):
+            image_md = '\n\n## 图片\n\n'
+            for img_url in meta['images']:
+                image_md += f'![图片]({img_url})\n\n'
+            content += image_md
+
+        # 微信公众号特殊处理（放宽图片限制 + 处理URL）
+        if site_type == 'wechat' and meta.get('images'):
+            image_md = '\n\n## 图片\n\n'
+            for img_url in meta['images']:
+                # 微信图片处理：去掉多余参数，尝试获取高清图
+                clean_url = img_url.split('?')[0]
+                if 'wx_fmt=' not in clean_url:
+                    clean_url += '?wx_fmt=jpeg'
+                image_md += f'![图片]({clean_url})\n\n'
+            content += image_md
         return {
             "content": content,
             "title": meta.get("ogTitle", meta.get("title", "")),
@@ -526,9 +620,23 @@ def fetch_page_content(url: str) -> dict:
 
 
 def localize_image_urls(content: str, save_dir: Path, page_url: str) -> tuple:
+    """图片本地化主函数，增加兜底逻辑处理 data-src 等懒加载图片"""
     """Download images and replace URLs with local relative paths.
     Returns (updated_content, image_count).
     """
+    from urllib.parse import urlparse, urljoin
+    
+    # 兜底逻辑：把正文中残留的 <img data-src> 也转为 Markdown 图片
+    img_tag_pattern = re.compile(
+        r'<img[^>]+(?:data-src|src)=["']([^"']+)["'][^>]*>', 
+        re.IGNORECASE
+    )
+    for match in img_tag_pattern.finditer(content):
+        img_url = match.group(1)
+        if img_url.startswith('http') and '![' not in content[match.start()-10:match.start()+50]:
+            # 转成 Markdown 格式，交给后续流程处理
+            content = content[:match.start()] + f'![图片]({img_url})' + content[match.end():]
+    
     from urllib.parse import urlparse, urljoin
     img_pattern = re.compile(r'!\[([^\]]*)\]\((https?://[^)]+)\)')
     matches = img_pattern.findall(content)
@@ -557,12 +665,58 @@ def localize_image_urls(content: str, save_dir: Path, page_url: str) -> tuple:
             local_path = assets_dir / local_name
 
             if not local_path.exists():
-                req = urllib.request.Request(img_url, headers=HEADERS)
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = resp.read()
-                    # Skip tiny images (likely tracking pixels)
-                    if len(data) < 500:
+                # 尝试下载（带 Referer 容错）
+                def try_download(url, referer=None):
+                    headers = HEADERS.copy()
+                    if referer:
+                        headers['Referer'] = referer
+                    if 'qpic.cn' in url or 'mmbiz.qpic.cn' in url:
+                        headers['Referer'] = 'https://mp.weixin.qq.com/'
+                    req = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(req, timeout=12) as resp:
+                        return resp.read()
+                
+                data = None
+                try:
+                    data = try_download(img_url)
+                except Exception:
+                    # 第一次失败，尝试带 Referer 再下一次
+                    try:
+                        domain = urlparse(img_url).netloc
+                        data = try_download(img_url, f"https://{domain}/")
+                    except Exception:
                         return None
+                
+                if data is None or len(data) < 20 * 1024:
+                    return None
+                    
+                    # 使用 Pillow 检查图片实际尺寸和内容，过滤无效图片
+                    try:
+                        from PIL import Image
+                        import io
+                        import numpy as np
+                        
+                        img = Image.open(io.BytesIO(data))
+                        
+                        if img.width < 150 or img.height < 150:
+                            return None
+                        
+                        # 检查是否接近全白或全透明（无效图片）
+                        if img.mode in ('RGBA', 'LA'):
+                            # 检查透明度
+                            alpha = img.getchannel('A')
+                            if np.array(alpha).mean() < 10:  # 几乎全透明
+                                return None
+                        
+                        # 检查是否接近纯白
+                        if img.mode == 'RGB':
+                            arr = np.array(img)
+                            if arr.mean() > 250:  # 非常接近白色
+                                return None
+                                
+                    except Exception:
+                        pass  # 如果无法解析图片则放行
+                    
                     local_path.write_bytes(data)
 
             rel_path = f"assets/{local_name}"
@@ -643,7 +797,7 @@ def save_to_knowledge_base(url: str, title: str, content: str,
         frontmatter.append(f"images_localized: {image_count}")
     frontmatter.append("---")
 
-    md_lines = frontmatter + ["", f"# {title or 'Untitled'}", "", content]
+    md_lines = frontmatter + ["", f"# {title or 'Untitled'}", "", content, "", "---", f"[原文链接]({url})"]
     filepath.write_text("\n".join(md_lines), encoding='utf-8')
 
     rel_path = filepath.relative_to(kb)
@@ -755,7 +909,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
                     return
 
                 if browser_html and len(browser_html) > 50:
-                    result = convert_html_to_markdown(browser_html, url, browser_meta)
+                    result = convert_html_to_markdown(browser_html, url, browser_meta, site_type=data.get('site_type'))
                 else:
                     result = fetch_page_content(url)
 
